@@ -1,0 +1,19 @@
+# Adds a local TimescaleDB, standing in for a Tiger Cloud service.
+# Start: docker compose -f compose.yaml -f compose.local.yaml up -d --wait
+services:
+  timescaledb:
+    image: timescale/timescaledb:2.30.2-pg17
+    environment:
+      POSTGRES_PASSWORD: password
+    ports:
+      - "5432:5432"
+    volumes:
+      - tsdb:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+volumes:
+  tsdb:
