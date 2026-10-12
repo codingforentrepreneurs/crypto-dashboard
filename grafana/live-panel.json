@@ -11,10 +11,6 @@
   "targets": [
     {
       "refId": "A",
-      "datasource": {
-        "type": "grafana-postgresql-datasource",
-        "uid": "${DS_TIGER}"
-      },
       "editorMode": "code",
       "format": "time_series",
       "rawQuery": true,
@@ -45,9 +41,5 @@
       "mode": "single"
     }
   },
-  "id": 8,
-  "datasource": {
-    "type": "grafana-postgresql-datasource",
-    "uid": "${DS_TIGER}"
-  }
+  "id": 8
 }

@@ -320,7 +320,7 @@ ORDER BY 1;
 
 Expand **Query options** under the query editor and set **Relative time** to `30m`. That panel now ignores the dashboard's January range and shows the last 30 minutes. Set the dashboard refresh to `10s` to watch ticks arrive.
 
-[`grafana/live-panel.json`](grafana/live-panel.json) is the same panel as JSON, if you would rather paste it in under **Inspect -> Panel JSON**.
+[`grafana/live-panel.json`](grafana/live-panel.json) is the same panel as JSON, if you would rather paste it in under **Inspect -> Panel JSON**. It carries no data source of its own, so Grafana binds it to the dashboard's current one.
 
 > [!NOTE]
 > Crypto trades around the clock, so `BTC/USD` returns fresh prices at any hour. A stock symbol returns its last close outside market hours, which looks like a stalled feed.
