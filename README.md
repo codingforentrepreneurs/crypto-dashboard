@@ -20,6 +20,26 @@ Built on [TimescaleDB](https://github.com/timescale/timescaledb) — a Postgres 
 - ~1 GB free disk — the zip and the extracted CSVs coexist until the script removes the zip
 - Port `3000` free on the host, plus `5432` on Option 2 (the local database)
 
+## Quickstart
+
+The whole thing on Tiger Cloud, data loaded and candles built. Create a free service at [console.cloud.tigerdata.com](https://console.cloud.tigerdata.com) first and copy its connection string.
+
+```bash
+git clone https://github.com/codingforentrepreneurs/crypto-dashboard.git
+cd crypto-dashboard
+./scripts/get-data.sh                      # 430 MB of sample ticks into data/
+cp .env.example .env                       # then set DATABASE_URL to your Tiger connection string
+docker compose up -d --wait                # Grafana on :3000
+set -a; . ./.env; set +a
+psql "$DATABASE_URL" -f sql/01-schema.sql  # hypertable + reference table
+./scripts/load-fast.sh                     # 10.8M rows over 8 connections
+psql "$DATABASE_URL" -f sql/04-candles.sql # hourly + daily candles
+```
+
+Then build the dashboard in [step 5](#5-build-the-dashboard), or switch to the [`finished`](../../tree/finished) branch for a prebuilt one. No Tiger account? Keep `.env` as shipped and start with `docker compose -f compose.yaml -f compose.local.yaml up -d --wait` instead — everything else is the same.
+
+The rest of this README walks through the same steps one at a time, with the SQL explained.
+
 ## Setup
 
 Start the same way either way:
@@ -127,6 +147,14 @@ Or from inside `psql`:
 ```
 
 `\COPY` streams the file from your machine, so run it from the repo root for the relative paths to resolve. Expect ~30 s on local Docker, longer against Tiger Cloud since it is bound by your upload speed.
+
+On Tiger Cloud, load over several connections at once instead (run it in place of `sql/02-load.sql`, after step 1):
+
+```bash
+./scripts/load-fast.sh         # 8 connections; JOBS=16 ./scripts/load-fast.sh for more
+```
+
+[`scripts/load-fast.sh`](scripts/load-fast.sh) splits the CSV, creates the hypertable's chunks up front so the connections don't wait on each other, then checks that all 10,772,350 rows arrived.
 
 ## 3. Query it in plain SQL
 
