@@ -299,14 +299,16 @@ WHERE hypertable_name = 'crypto_ticks';
 
 This branch adds Grafana auto-provisioning, so the PostgreSQL data source and all seven panels exist the moment Grafana starts — no clicking through step 5.
 
+The provisioned data source points at the local Docker database, so layer this on **Option 2**:
+
 ```bash
-docker compose -f compose.yaml -f compose.finished.yaml up -d --wait
+docker compose -f compose.yaml -f compose.local.yaml -f compose.finished.yaml up -d --wait
 ```
 
 Then open http://localhost:3000 (`admin` / `admin`) and go to **Dashboards -> Crypto Prices**.
 
 > [!NOTE]
-> The provisioned data source points at the local Docker database, so this branch assumes **Option 1**. On Option 2, edit `grafana/provisioning/datasources/tigerdata.yaml` to your Tiger Cloud host, database `tsdb`, user `tsdbadmin` and `sslmode: require` before starting Grafana.
+> On **Option 1** (Tiger Cloud), edit `grafana/provisioning/datasources/tigerdata.yaml` first — set `url` to your `<host>:<port>`, `database` to `tsdb`, `user` to `tsdbadmin`, your password, and `sslMode: require` — then start with `docker compose -f compose.yaml -f compose.finished.yaml up -d --wait`.
 
 > [!IMPORTANT]
 > This provisions Grafana, not the data. The panels are wired up but will read *No data* until the database is loaded. Run `./scripts/get-data.sh`, then steps 1, 2 and 4 above.
