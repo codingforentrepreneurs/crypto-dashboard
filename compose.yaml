@@ -1,0 +1,30 @@
+# Local stand-in for a Tiger Cloud service, plus Grafana.
+# Start: docker compose up -d
+services:
+  timescaledb:
+    image: timescale/timescaledb:2.30.2-pg17
+    environment:
+      POSTGRES_PASSWORD: password
+    ports:
+      - "5432:5432"
+    volumes:
+      - tsdb:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  grafana:
+    image: grafana/grafana:13.2.3
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana:/var/lib/grafana
+    depends_on:
+      timescaledb:
+        condition: service_healthy
+
+volumes:
+  tsdb:
+  grafana:
