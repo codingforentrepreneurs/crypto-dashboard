@@ -14,9 +14,11 @@ Built on [TimescaleDB](https://github.com/timescale/timescaledb) — a Postgres 
 
 ## Requirements
 
-- Docker (or a free [Tiger Cloud](https://console.cloud.tigerdata.com) service)
+- Docker with Compose v2 — `docker compose version` must print 2.1.1 or newer, since `--wait` needs it. A free [Tiger Cloud](https://console.cloud.tigerdata.com) service can stand in for the local database, but Grafana still runs in Docker.
+- `git`, `curl` and `unzip` — all three ship with macOS; `apt install git curl unzip` on Debian/Ubuntu
 - `psql` — `brew install libpq` on macOS, `apt install postgresql-client` on Debian/Ubuntu
-- ~500 MB free disk for the sample data
+- ~1 GB free disk — the zip and the extracted CSVs coexist until the script removes the zip
+- Ports 5432 and 3000 free on the host
 
 ## Setup
 
@@ -28,14 +30,16 @@ cp .env.example .env
 docker compose up -d --wait    # Postgres + TimescaleDB on :5432, Grafana on :3000
 ```
 
-To use Tiger Cloud instead of Docker, create a free service, then put its connection string in `.env` as `DATABASE_URL`. Everything below is unchanged.
+To use Tiger Cloud instead of a local database, create a free service and put its connection string in `.env` as `DATABASE_URL`. Still run `docker compose up -d --wait` — step 5 needs the Grafana container it starts, and you can ignore the local `timescaledb` service alongside it. Everything else below is unchanged.
 
 Load the connection string into your shell. Do this in every new terminal:
 
 ```bash
 set -a; . ./.env; set +a
-psql "$DATABASE_URL"
+psql "$DATABASE_URL" -c 'SELECT version();'
 ```
+
+That last line is just a connection check. The steps below each run a file, so you do not need to stay in an interactive `psql` session.
 
 ## About the data
 
@@ -45,6 +49,8 @@ psql "$DATABASE_URL"
 > The ticks run **2026-01-12 18:34 → 2026-01-29 12:05 UTC**. Point every query and the Grafana time picker at that window. Relative filters like `NOW() - INTERVAL '14 days'` return zero rows.
 
 `day_volume` is only populated for ETH, SOL, DOGE and DAI, so the dashboard uses tick count as its volume bar.
+
+Row counts, sizes and timings quoted below come from one run on local Docker (TimescaleDB 2.30.2, PG 17). Your own numbers will differ.
 
 ## 1. Create the tables
 
@@ -110,7 +116,9 @@ WHERE hypertable_name = 'crypto_ticks'
 ORDER BY range_start;
 ```
 
-Four chunks, seven days each (the default). Now the latest price per asset — a TimescaleDB function next to an ordinary JOIN:
+Four chunks, seven days each (the default). `is_compressed` should read `f` for all of them — step 6 is what changes that. If any chunk already says `t`, the columnstore policy on the table has fired, and step 6's before/after will already reflect it.
+
+Now the latest price per asset — a TimescaleDB function next to an ordinary JOIN:
 
 ```sql
 SELECT a."name", t.symbol, last(t.price, t."time") AS price, max(t."time") AS as_of
@@ -180,7 +188,16 @@ The policy re-aggregates only the recent window on a schedule, not the whole tab
 psql "$DATABASE_URL" -f sql/04-candles.sql
 ```
 
-Compare `\timing` on the daily candles against step 3's raw-tick version — roughly 225 ms down to 1 ms.
+The same file creates `one_day_candle` the same way on a `'1 day'` bucket, with a daily refresh policy. Step 5's symbol dropdown reads from it.
+
+Time the precomputed daily candles against step 3's raw-tick version:
+
+```sql
+\timing on
+SELECT * FROM one_day_candle WHERE symbol = 'BTC/USD' ORDER BY bucket;
+```
+
+Roughly 225 ms down to 1 ms.
 
 ## 5. Build the dashboard
 
@@ -213,7 +230,7 @@ Open http://localhost:3000, log in with `admin` / `admin`, and skip the password
    ```
 
    `$__timeFilter` expands into a `WHERE` clause, so dragging to zoom re-queries Postgres instead of filtering in the browser.
-3. Add a symbol dropdown: **Dashboard settings → Variables → New variable**, type **Query**, name `symbol`:
+3. Add a symbol dropdown: **Dashboard settings → Variables → New variable**, type **Query**, data source **PostgreSQL** (the one you just added), name `symbol`:
 
    ```sql
    SELECT DISTINCT symbol FROM one_day_candle ORDER BY 1;
@@ -221,20 +238,21 @@ Open http://localhost:3000, log in with `admin` / `admin`, and skip the password
 
    Replace `'BTC/USD'` with `'$symbol'` in the panel query, then pick ETH/USD from the dropdown.
 
-[`sql/05-dashboard.sql`](sql/05-dashboard.sql) has more panel queries: a price line straight from raw ticks, a last-price stat, percent change over the selected range, and a bar chart comparing every asset.
+[`sql/05-dashboard.sql`](sql/05-dashboard.sql) has more panel queries: a price line straight from raw ticks, a last-price stat, percent change over the selected range, a bar chart comparing every asset, and a row count that never scans the table.
 
 ## 6. Move it to the columnstore
 
 [`sql/06-columnstore.sql`](sql/06-columnstore.sql)
 
 ```sql
-SELECT pg_size_pretty(hypertable_size('crypto_ticks'));
+SELECT pg_size_pretty(hypertable_size('crypto_ticks')) AS total_size;
 
 SELECT compress_chunk(c, if_not_compressed => true)
 FROM show_chunks('crypto_ticks') c;
 
 SELECT pg_size_pretty(before_compression_total_bytes) AS before,
-       pg_size_pretty(after_compression_total_bytes)  AS after
+       pg_size_pretty(after_compression_total_bytes)  AS after,
+       round(100 - 100.0 * after_compression_total_bytes / before_compression_total_bytes, 1) AS pct_saved
 FROM hypertable_columnstore_stats('crypto_ticks');
 ```
 
@@ -243,7 +261,7 @@ FROM hypertable_columnstore_stats('crypto_ticks');
 The table was created with a policy that does this on a schedule for chunks older than seven days:
 
 ```sql
-SELECT job_id, schedule_interval, config
+SELECT job_id, schedule_interval, config, next_start
 FROM timescaledb_information.jobs
 WHERE hypertable_name = 'crypto_ticks';
 ```
@@ -280,7 +298,7 @@ Provisioned dashboards cannot be saved from the Grafana UI, which is what you wa
 | [`finished`](../../tree/finished) | Grafana with the data source and all 7 panels already provisioned |
 
 ```bash
-git checkout api
+git switch api
 ```
 
 ## Start over
