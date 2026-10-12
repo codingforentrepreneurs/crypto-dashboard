@@ -21,9 +21,8 @@ services:
       - "3000:3000"
     volumes:
       - grafana:/var/lib/grafana
-    depends_on:
-      timescaledb:
-        condition: service_healthy
+    # No depends_on: Grafana does not need the database at boot, and leaving it out lets
+    # `docker compose up -d --wait grafana` start Grafana alone for the Tiger Cloud path.
 
 volumes:
   tsdb:

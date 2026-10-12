@@ -14,23 +14,50 @@ Built on [TimescaleDB](https://github.com/timescale/timescaledb) — a Postgres 
 
 ## Requirements
 
-- Docker with Compose v2 — `docker compose version` must print 2.1.1 or newer, since `--wait` needs it. A free [Tiger Cloud](https://console.cloud.tigerdata.com) service can stand in for the local database, but Grafana still runs in Docker.
+- Docker with Compose v2 — `docker compose version` must print 2.1.1 or newer, since `--wait` needs it. Grafana runs in Docker on both setup options below.
 - `git`, `curl` and `unzip` — all three ship with macOS; `apt install git curl unzip` on Debian/Ubuntu
 - `psql` — `brew install libpq` on macOS, `apt install postgresql-client` on Debian/Ubuntu
 - ~1 GB free disk — the zip and the extracted CSVs coexist until the script removes the zip
-- Ports 5432 and 3000 free on the host
+- Port `3000` free on the host, plus `5432` if you use the local database (Option 1)
 
 ## Setup
+
+Start the same way either way:
 
 ```bash
 git clone https://github.com/codingforentrepreneurs/crypto-dashboard.git
 cd crypto-dashboard
 ./scripts/get-data.sh          # downloads + unzips 430 MB of sample ticks into data/
 cp .env.example .env
-docker compose up -d --wait    # Postgres + TimescaleDB on :5432, Grafana on :3000
 ```
 
-To use Tiger Cloud instead of a local database, create a free service and put its connection string in `.env` as `DATABASE_URL`. Still run `docker compose up -d --wait` — step 5 needs the Grafana container it starts, and you can ignore the local `timescaledb` service alongside it. Everything else below is unchanged.
+Now pick one of the two. Everything from step 1 on is identical.
+
+### Option 1 — everything local, in Docker
+
+```bash
+docker compose up -d --wait
+```
+
+Postgres + TimescaleDB on `:5432`, Grafana on `:3000`. The `DATABASE_URL` already in `.env` points at it, so there is nothing to edit.
+
+### Option 2 — database on Tiger Cloud, Grafana local
+
+Create a free service at [console.cloud.tigerdata.com](https://console.cloud.tigerdata.com), then copy its connection string into `.env` as `DATABASE_URL` — keep the `?sslmode=require` on the end:
+
+```bash
+DATABASE_URL=postgres://tsdbadmin:<password>@<host>:<port>/tsdb?sslmode=require
+```
+
+Then start Grafana on its own:
+
+```bash
+docker compose up -d --wait grafana
+```
+
+Naming the service starts only Grafana, so port `5432` stays free for whatever Postgres you already run locally.
+
+### Then, either way
 
 Load the connection string into your shell. Do this in every new terminal:
 
@@ -205,7 +232,7 @@ Open http://localhost:3000, log in with `admin` / `admin`, and skip the password
 
 **Connections → Data sources → Add new data source → PostgreSQL**
 
-| Field | Local Docker | Tiger Cloud |
+| Field | Option 1, local Docker | Option 2, Tiger Cloud |
 |---|---|---|
 | Host URL | `timescaledb:5432` | `<host>:<port>` — the port is required |
 | Database | `postgres` | `tsdb` |
