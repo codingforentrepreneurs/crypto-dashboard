@@ -1,29 +1,15 @@
-# Local stand-in for a Tiger Cloud service, plus Grafana.
-# Start: docker compose up -d
+# Grafana only. The database is a Tiger Cloud service — put its URL in .env as DATABASE_URL.
+# Start: docker compose up -d --wait
+#
+# To run the database locally instead, layer the override:
+#   docker compose -f compose.yaml -f compose.local.yaml up -d --wait
 services:
-  timescaledb:
-    image: timescale/timescaledb:2.30.2-pg17
-    environment:
-      POSTGRES_PASSWORD: password
-    ports:
-      - "5432:5432"
-    volumes:
-      - tsdb:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD", "pg_isready", "-U", "postgres"]
-      interval: 2s
-      timeout: 3s
-      retries: 30
-
   grafana:
     image: grafana/grafana:13.2.3
     ports:
       - "3000:3000"
     volumes:
       - grafana:/var/lib/grafana
-    # No depends_on: Grafana does not need the database at boot, and leaving it out lets
-    # `docker compose up -d --wait grafana` start Grafana alone for the Tiger Cloud path.
 
 volumes:
-  tsdb:
   grafana:
