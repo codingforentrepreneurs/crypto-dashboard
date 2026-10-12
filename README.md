@@ -248,6 +248,65 @@ FROM timescaledb_information.jobs
 WHERE hypertable_name = 'crypto_ticks';
 ```
 
+## 7. Stream live prices
+
+`main` stops at the January sample. This branch adds a live feed from the [Twelve Data](https://twelvedata.com) API into the same hypertable.
+
+Get a free API key at [twelvedata.com/pricing](https://twelvedata.com/pricing) — 8 requests per minute, 800 per day, no card. Put it in `.env`:
+
+```bash
+TWELVEDATA_API_KEY=your_key_here
+```
+
+### Backfill the last few hours
+
+```bash
+./scripts/live-ticks.sh backfill BTC/USD
+```
+
+One API call pulls 390 one-minute bars and `\COPY`s them in, mapping each bar's close to `price`.
+
+### Then stream
+
+In a second terminal:
+
+```bash
+./scripts/live-ticks.sh stream BTC/USD 10
+```
+
+One row per poll, every 10 seconds — 6 requests a minute, under the free limit. `Ctrl-C` to stop.
+
+### What to look for
+
+```bash
+psql "$DATABASE_URL" -f sql/07-live.sql
+```
+
+[`sql/07-live.sql`](sql/07-live.sql) walks three things:
+
+1. **A new chunk appears.** The live rows are months newer than the sample, so the hypertable creates a fresh chunk for today. If you ran step 6, it sits uncompressed right next to the compressed January chunks — compression is per chunk, and new writes land in the rowstore.
+2. **The candles do not move.** `one_hour_candle` keeps returning January. Since TimescaleDB 2.13, `materialized_only` defaults to `true`, so a continuous aggregate returns only what has been materialized, up to its watermark — and your live ticks are past it.
+3. **Two ways to surface them.** `refresh_continuous_aggregate` materializes a recent window, but only buckets that have *closed* — the hour in progress stays invisible no matter how often you refresh. `ALTER MATERIALIZED VIEW ... SET (timescaledb.materialized_only = false)` switches on real-time aggregation, merging the unmaterialized tail at query time, so the open bucket finally shows up. The tradeoff is that every query then does a little work over the raw tail instead of only reading precomputed rows.
+
+### A live Grafana panel
+
+The dashboard's time range is pinned to January, so a live panel needs a per-panel override. Add a panel, switch the query to **Code**, format **Time series**:
+
+```sql
+SELECT time_bucket('$__interval', "time") AS time, last(price, "time") AS price
+FROM crypto_ticks
+WHERE symbol = '$symbol' AND $__timeFilter("time")
+GROUP BY 1
+ORDER BY 1;
+```
+
+Expand **Query options** under the query editor and set **Relative time** to `30m`. That panel now ignores the dashboard's January range and shows the last 30 minutes. Set the dashboard refresh to `10s` to watch ticks arrive.
+
+[`grafana/live-panel.json`](grafana/live-panel.json) is the same panel as JSON, if you would rather paste it in under **Inspect -> Panel JSON**.
+
+> [!NOTE]
+> Crypto trades around the clock, so `BTC/USD` returns fresh prices at any hour. A stock symbol returns its last close outside market hours, which looks like a stalled feed.
+
 ## Branches
 
 | Branch | What it adds |

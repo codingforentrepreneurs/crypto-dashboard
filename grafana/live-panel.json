@@ -1,0 +1,53 @@
+{
+  "type": "timeseries",
+  "title": "$symbol live ticks",
+  "gridPos": {
+    "x": 0,
+    "y": 26,
+    "w": 24,
+    "h": 9
+  },
+  "timeFrom": "30m",
+  "targets": [
+    {
+      "refId": "A",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "${DS_TIGER}"
+      },
+      "editorMode": "code",
+      "format": "time_series",
+      "rawQuery": true,
+      "rawSql": "SELECT time_bucket('$__interval', \"time\") AS time,\n       last(price, \"time\") AS price\nFROM crypto_ticks\nWHERE symbol = '$symbol' AND $__timeFilter(\"time\")\nGROUP BY 1\nORDER BY 1;"
+    }
+  ],
+  "fieldConfig": {
+    "defaults": {
+      "unit": "currencyUSD",
+      "decimals": 2,
+      "noValue": "waiting for ticks",
+      "custom": {
+        "drawStyle": "line",
+        "lineWidth": 2,
+        "fillOpacity": 0,
+        "showPoints": "always",
+        "pointSize": 5,
+        "spanNulls": true
+      }
+    },
+    "overrides": []
+  },
+  "options": {
+    "legend": {
+      "showLegend": false
+    },
+    "tooltip": {
+      "mode": "single"
+    }
+  },
+  "id": 8,
+  "datasource": {
+    "type": "grafana-postgresql-datasource",
+    "uid": "${DS_TIGER}"
+  }
+}
