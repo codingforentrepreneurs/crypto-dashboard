@@ -303,6 +303,9 @@ docker compose -f compose.yaml -f compose.finished.yaml up -d --wait
 
 Then open http://localhost:3000 (`admin` / `admin`) and go to **Dashboards -> Crypto Prices**.
 
+> [!NOTE]
+> The provisioned data source points at the local Docker database, so this branch assumes **Option 1**. On Option 2, edit `grafana/provisioning/datasources/tigerdata.yaml` to your Tiger Cloud host, database `tsdb`, user `tsdbadmin` and `sslmode: require` before starting Grafana.
+
 > [!IMPORTANT]
 > This provisions Grafana, not the data. The panels are wired up but will read *No data* until the database is loaded. Run `./scripts/get-data.sh`, then steps 1, 2 and 4 above.
 
