@@ -248,6 +248,29 @@ FROM timescaledb_information.jobs
 WHERE hypertable_name = 'crypto_ticks';
 ```
 
+## Prebuilt dashboard
+
+This branch adds Grafana auto-provisioning, so the PostgreSQL data source and all seven panels exist the moment Grafana starts — no clicking through step 5.
+
+```bash
+docker compose -f compose.yaml -f compose.finished.yaml up -d --wait
+```
+
+Then open http://localhost:3000 (`admin` / `admin`) and go to **Dashboards -> Crypto Prices**.
+
+> [!IMPORTANT]
+> This provisions Grafana, not the data. The panels are wired up but will read *No data* until the database is loaded. Run `./scripts/get-data.sh`, then steps 1, 2 and 4 above.
+
+Provisioned dashboards cannot be saved from the Grafana UI, which is what you want from an answer key. For a copy you can edit, use **Dashboards -> New -> Import**, upload `grafana/crypto-prices-import.json`, and pick your data source when prompted.
+
+| File | Role |
+|---|---|
+| `compose.finished.yaml` | Mounts the two directories below into the Grafana container |
+| `grafana/provisioning/datasources/tigerdata.yaml` | The local Docker data source, `uid: tigerdata` |
+| `grafana/provisioning/dashboards/dashboards.yaml` | Tells Grafana where to find dashboard files |
+| `grafana/dashboards/crypto-prices.json` | The dashboard, bound to `uid: tigerdata` |
+| `grafana/crypto-prices-import.json` | The same dashboard with the data source left unbound, for manual import |
+
 ## Branches
 
 | Branch | What it adds |

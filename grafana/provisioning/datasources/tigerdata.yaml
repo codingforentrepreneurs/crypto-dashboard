@@ -1,0 +1,15 @@
+apiVersion: 1
+datasources:
+  - name: Tiger Data
+    uid: tigerdata
+    type: grafana-postgresql-datasource
+    url: timescaledb:5432
+    user: postgres
+    isDefault: true
+    jsonData:
+      database: postgres
+      sslmode: disable
+      timescaledb: true
+      postgresVersion: 1700
+    secureJsonData:
+      password: password

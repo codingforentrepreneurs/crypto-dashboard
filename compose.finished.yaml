@@ -1,0 +1,7 @@
+# Answer key: Grafana with the data source and dashboard already provisioned.
+# docker compose -f compose.yaml -f compose.finished.yaml up -d
+services:
+  grafana:
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
